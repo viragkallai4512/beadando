@@ -1,72 +1,36 @@
-import numpy as np
+#ez a program mikrofont használ ami az elején be lett állitva nekem a 18-as ID-val létező mikrofon tömböt használja de lehet ez másnál más. Ezzel a kis #egyszerű kóddal ellenörizheti melyikkel müködik a a hangoló: 
+#import numpy as np
 import sounddevice as sd
 
-# Gitár húrok (EADGBE) referenciafrekvenciái
-TARGET_NOTES = {
-    "E2": 82.41,
-    "A2": 110.00,
-    "D3": 146.83,
-    "G3": 196.00,
-    "B3": 246.94,
-    "E4": 329.63
-}
-
 SAMPLE_RATE = 44100
-DURATION = 0.5  # másodperc – ennyi hangmintát elemezünk
+DURATION = 1  # másodperc
 
-def get_frequency():
-    """Felvesz fél másodperc mikrofonhangot, és meghatározza a legerősebb frekvenciát."""
-    print("🎤 Hallgatom a hangot... (pengetsd meg a húrt)")
-    audio = sd.rec(int(SAMPLE_RATE * DURATION), samplerate=SAMPLE_RATE, channels=1)
-    sd.wait()
+# Ha több mikrofon is van, ki lehet választani:
+# print(sd.query_devices())
+MIC_INDEX = 18  # itt állítsd be a megfelelő mikrofon ID-t
+sd.default.device = (MIC_INDEX, None)
 
-    # Átalakítás és FFT
+VOLUME_THRESHOLD = 0.00005
+
+def get_frequency(audio):
     samples = audio.flatten()
     fft = np.fft.fft(samples)
     freqs = np.fft.fftfreq(len(fft), 1/SAMPLE_RATE)
-
-    # Csak pozitív frekvenciák
     idx = np.argmax(np.abs(fft[:len(fft)//2]))
-    dominant_freq = abs(freqs[idx])
-    return dominant_freq
+    return abs(freqs[idx])
 
-def needle(diff):
-    """Egyszerű ASCII tű, bal = engedni, jobb = húzni."""
-    scale = 20  # ennyi karakter széles a skála
-    pos = int((diff + 20) / 40 * scale)  # diff -20Hz és +20Hz között várható
-    pos = max(0, min(scale, pos))
+print("🎤 Mikrofon teszt: beszélj vagy készíts hangot a mikrofonba...")
 
-    line = ["-"] * (scale + 1)
-    if 0 <= pos <= scale:
-        line[pos] = "|"
+audio = sd.rec(int(SAMPLE_RATE * DURATION), samplerate=SAMPLE_RATE, channels=1)
+sd.wait()
 
-    return "".join(line)
+samples = audio.flatten()
+volume = np.sqrt(np.mean(samples**2))
+freq = get_frequency(audio)
 
-print("🎸 Gitárhangoló indítva!")
-print("Válaszd ki, melyik húrt hangolod:")
-
-for i, note in enumerate(TARGET_NOTES.keys(), start=1):
-    print(f"{i}. {note}")
-
-choice = int(input("Húrszám (1-6): "))
-note = list(TARGET_NOTES.keys())[choice - 1]
-target_freq = TARGET_NOTES[note]
-
-print(f"\nA(z) {note} húr referenciafrekvenciája: {target_freq} Hz")
-print("Pengetsd meg a húrt...")
-
-while True:
-    freq = get_frequency()
-    diff = freq - target_freq
-
-    print(f"\n🎵 Mért frekvencia: {freq:.2f} Hz")
-    print(needle(diff))
-
-    if abs(diff) < 1:
-        print("✅ Jó hangolás!")
-    elif diff > 0:
-        print("⬇️ Engedni kell a húrt!")
-    else:
-        print("⬆️ Húzni kell a húrt!")
-
-    print("\n(CTRL+C a kilépéshez)\n")
+print(f"Hangerő (RMS): {volume:.6f}")
+if volume < VOLUME_THRESHOLD:
+    print("❌ Nem érzékel hangot, ellenőrizd a mikrofont vagy a hangerőt.")
+else:
+    print("✅ Hang érzékelve!")
+    print(f"Domináns frekvencia: {freq:.2f} Hz")
