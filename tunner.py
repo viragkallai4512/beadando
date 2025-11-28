@@ -1,7 +1,8 @@
-pip install -r requirements.txt
-
 import numpy as np
 import sounddevice as sd
+
+def install(package):
+    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
 
 # Gitár húrok (EADGBE) referenciafrekvenciái
 TARGET_NOTES = {
