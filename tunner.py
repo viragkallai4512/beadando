@@ -1,10 +1,15 @@
 import numpy as np
 import sounddevice as sd
+import os
+import platform
+import time
 
-def install(package):
-    subprocess.check_call([sys.executable, "-m", "pip", "install", package])
+# --- MIKROFON BEÁLLÍTÁS ---
+MIC_INDEX = 18
+sd.default.device = (MIC_INDEX, None)
 
-# Gitár húrok (EADGBE) referenciafrekvenciái
+VOLUME_THRESHOLD = 0.00005
+
 TARGET_NOTES = {
     "E2": 82.41,
     "A2": 110.00,
@@ -15,61 +20,109 @@ TARGET_NOTES = {
 }
 
 SAMPLE_RATE = 44100
-DURATION = 0.5  # másodperc – ennyi hangmintát elemezünk
+DURATION = 0.5
+FREQ_THRESHOLD = 0.5  # Hz
+
+TOLERANCE_OK = 1      # ±1 Hz → hangolt
+TOLERANCE_NEAR = 3    # ±3 Hz → közel jó, finomhangolás
+
+def clear_console():
+    if platform.system() == "Windows":
+        os.system('cls')
+    else:
+        os.system('clear')
 
 def get_frequency():
-    """Felvesz fél másodperc mikrofonhangot, és meghatározza a legerősebb frekvenciát."""
-    print("🎤 Hallgatom a hangot... (pengetsd meg a húrt)")
     audio = sd.rec(int(SAMPLE_RATE * DURATION), samplerate=SAMPLE_RATE, channels=1)
     sd.wait()
-
-    # Átalakítás és FFT
     samples = audio.flatten()
+    volume = np.sqrt(np.mean(samples**2))
+    if volume < VOLUME_THRESHOLD:
+        return None
     fft = np.fft.fft(samples)
     freqs = np.fft.fftfreq(len(fft), 1/SAMPLE_RATE)
-
-    # Csak pozitív frekvenciák
     idx = np.argmax(np.abs(fft[:len(fft)//2]))
-    dominant_freq = abs(freqs[idx])
-    return dominant_freq
+    return abs(freqs[idx])
 
 def needle(diff):
-    """Egyszerű ASCII tű, bal = engedni, jobb = húzni."""
-    scale = 20  # ennyi karakter széles a skála
-    pos = int((diff + 20) / 40 * scale)  # diff -20Hz és +20Hz között várható
+    scale = 20
+    pos = int((diff/2 + 20) / 40 * scale)
     pos = max(0, min(scale, pos))
-
     line = ["-"] * (scale + 1)
-    if 0 <= pos <= scale:
-        line[pos] = "|"
-
+    line[pos] = "|"
     return "".join(line)
 
-print("🎸 Gitárhangoló indítva!")
-print("Válaszd ki, melyik húrt hangolod:")
+def choose_string():
+    while True:
+        clear_console()
+        print("🎸 Gitárhangoló")
+        print("Válaszd ki a húrt (1-6) vagy Q a kilépéshez:")
+        for i, note in enumerate(TARGET_NOTES.keys(), start=1):
+            print(f"{i}. {note}")
+        choice = input("> ").strip().upper()
+        if choice == "Q":
+            return None
+        if choice in ["1","2","3","4","5","6"]:
+            return list(TARGET_NOTES.keys())[int(choice)-1]
 
-for i, note in enumerate(TARGET_NOTES.keys(), start=1):
-    print(f"{i}. {note}")
-
-choice = int(input("Húrszám (1-6): "))
-note = list(TARGET_NOTES.keys())[choice - 1]
-target_freq = TARGET_NOTES[note]
-
-print(f"\nA(z) {note} húr referenciafrekvenciája: {target_freq} Hz")
-print("Pengetsd meg a húrt...")
-
+# --- FŐ PROGRAM ---
 while True:
-    freq = get_frequency()
-    diff = freq - target_freq
+    note = choose_string()
+    if note is None:
+        print("Kiléptél a programból.")
+        break
 
-    print(f"\n🎵 Mért frekvencia: {freq:.2f} Hz")
-    print(needle(diff))
+    target_freq = TARGET_NOTES[note]
+    clear_console()
+    print(f"🎵 Hangolás: {note} ({target_freq} Hz)")
+    print("Pengetsd meg a húrt... (Q visszalépés, K kilépés)")
 
-    if abs(diff) < 1:
-        print("✅ Jó hangolás!")
-    elif diff > 0:
-        print("⬇️ Engedni kell a húrt!")
-    else:
-        print("⬆️ Húzni kell a húrt!")
+    last_freq = None
+    pengetes_kiirva = True  # csak egyszer írjuk ki a pengetés üzenetet
 
-    print("\n(CTRL+C a kilépéshez)\n")
+    while True:
+        freq = get_frequency()
+        if freq is None:
+            continue
+
+        if last_freq is None:
+            last_freq = freq
+
+        if abs(freq - last_freq) < FREQ_THRESHOLD:
+            continue
+
+        diff = freq - target_freq
+
+        # Irány meghatározása
+        if abs(diff) <= TOLERANCE_OK:
+            direction = "ok"
+        elif abs(diff) <= TOLERANCE_NEAR:
+            direction = "near"
+        elif diff > 0:
+            direction = "down"
+        else:
+            direction = "up"
+
+        # Sor felülírás
+        print("\r" + " " * 80, end="")
+        print("\r", end="")
+        print(f"{needle(diff)} ", end="")
+
+        if direction == "ok":
+            print("✅ Hangolt húr!", end="")
+            print()
+            action = input("Visszalépsz a húrválasztáshoz (V) vagy kilépsz a programból (K)? [V/K]: ").strip().upper()
+            if action == "V":
+                break
+            elif action == "K":
+                print("Kiléptél a programból.")
+                exit()
+        elif direction == "near":
+            print("🔹 Közel jó, finomhangolj!", end="")
+        elif direction == "down":
+            print("⬇️ Engedni kell a húrt!", end="")
+        else:
+            print("⬆️ Húzni kell a húrt!", end="")
+
+        last_freq = freq
+        time.sleep(0.1)
