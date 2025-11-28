@@ -4,7 +4,6 @@ import os
 import platform
 import time
 
-# --- MIKROFON BEÁLLÍTÁS ---
 MIC_INDEX = 18
 sd.default.device = (MIC_INDEX, None)
 
@@ -21,10 +20,10 @@ TARGET_NOTES = {
 
 SAMPLE_RATE = 44100
 DURATION = 0.5
-FREQ_THRESHOLD = 0.5  # Hz
+FREQ_THRESHOLD = 0.5  
 
-TOLERANCE_OK = 1      # ±1 Hz → hangolt
-TOLERANCE_NEAR = 3    # ±3 Hz → közel jó, finomhangolás
+TOLERANCE_OK = 1      
+TOLERANCE_NEAR = 3    
 
 def clear_console():
     if platform.system() == "Windows":
@@ -64,8 +63,7 @@ def choose_string():
             return None
         if choice in ["1","2","3","4","5","6"]:
             return list(TARGET_NOTES.keys())[int(choice)-1]
-
-# --- FŐ PROGRAM ---
+            
 while True:
     note = choose_string()
     if note is None:
@@ -75,10 +73,10 @@ while True:
     target_freq = TARGET_NOTES[note]
     clear_console()
     print(f"🎵 Hangolás: {note} ({target_freq} Hz)")
-    print("Pengetsd meg a húrt... (Q visszalépés, K kilépés)")
+    print("Pengetsd meg a húrt...")
 
     last_freq = None
-    pengetes_kiirva = True  # csak egyszer írjuk ki a pengetés üzenetet
+    pengetes_kiirva = True 
 
     while True:
         freq = get_frequency()
@@ -93,7 +91,6 @@ while True:
 
         diff = freq - target_freq
 
-        # Irány meghatározása
         if abs(diff) <= TOLERANCE_OK:
             direction = "ok"
         elif abs(diff) <= TOLERANCE_NEAR:
@@ -103,7 +100,6 @@ while True:
         else:
             direction = "up"
 
-        # Sor felülírás
         print("\r" + " " * 80, end="")
         print("\r", end="")
         print(f"{needle(diff)} ", end="")
