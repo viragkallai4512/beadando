@@ -1,3 +1,5 @@
+pip install -r requirements.txt
+
 import numpy as np
 import sounddevice as sd
 
