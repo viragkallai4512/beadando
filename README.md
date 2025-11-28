@@ -1,5 +1,7 @@
 #ez a program mikrofont használ ami az elején be lett állitva nekem a 18-as ID-val létező mikrofon tömböt használja de lehet ez másnál más. Ezzel a kis #egyszerű kóddal ellenörizheti melyikkel müködik a a hangoló: 
-#import numpy as np
+
+
+import numpy as np
 import sounddevice as sd
 
 SAMPLE_RATE = 44100
