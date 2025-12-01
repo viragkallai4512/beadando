@@ -77,41 +77,93 @@ while True:
         print("Kiléptél a programból.")
         break
 
+target_freq = TARGET_NOTES[note]
+    clear_console()
+    print(f"🎵 Hangolás: {note} ({target_freq} Hz)")
+    print("Pengetsd meg a húrt...")
 
+ last_freq = None
+    pengetes_kiirva = True 
+    
+while True:
+        freq = get_frequency()
+        if freq is None:
+            continue
 
+if last_freq is None:
+            last_freq = freq
 
-import numpy as np
+  if abs(freq - last_freq) < FREQ_THRESHOLD:
+            continue
+
+   diff = freq - target_freq
+
+   if abs(diff) <= TOLERANCE_OK:
+            direction = "ok"
+        elif abs(diff) <= TOLERANCE_NEAR:
+            direction = "near"
+        elif diff > 0:
+            direction = "down"
+        else:
+            direction = "up"
+
+   print("\r" + " " * 80, end="")
+        print("\r", end="")
+        print(f"{needle(diff)} ", end="")
+
+   if direction == "ok":
+            print("✅ Hangolt húr!", end="")
+            print()
+            action = input("Visszalépsz a húrválasztáshoz (V) vagy kilépsz a programból (K)? [V/K]: ").strip().upper()
+            if action == "V":
+                break
+            elif action == "K":
+                print("Kiléptél a programból.")
+                exit()
+        elif direction == "near":
+            print("🔹 Közel jó, finomhangolj!", end="")
+        elif direction == "down":
+            print("⬇️ Engedni kell a húrt!", end="")
+        else:
+            print("⬆️ Húzni kell a húrt!", end="")
+
+  last_freq = freq
+        time.sleep(0.1)
+
+ez pedig az ahol amivel a megfelelő mikrofont amit használ a program azzal kerestem meg (lehet mindenkinek más és azért raktam be); 
+
 import sounddevice as sd
+import numpy as np
 
-SAMPLE_RATE = 44100
-DURATION = 1  # másodperc
+DURATION = 0.3   # 300 ms felvétel
 
-# Ha több mikrofon is van, ki lehet választani:
-# print(sd.query_devices())
-MIC_INDEX = 18  # itt állítsd be a megfelelő mikrofon ID-t
-sd.default.device = (MIC_INDEX, None)
+def list_devices():
+    print("Elérhető eszközök:")
+    print(sd.query_devices())
 
-VOLUME_THRESHOLD = 0.00005
+def test_mic(device_id=None):
+    print("Mikrofon teszt indul...")
 
-def get_frequency(audio):
-    samples = audio.flatten()
-    fft = np.fft.fft(samples)
-    freqs = np.fft.fftfreq(len(fft), 1/SAMPLE_RATE)
-    idx = np.argmax(np.abs(fft[:len(fft)//2]))
-    return abs(freqs[idx])
+while True:
+        audio = sd.rec(int(DURATION * 44100),
+                       samplerate=44100,
+                       channels=1,
+                       device=device_id)
+        sd.wait()
 
-print("🎤 Mikrofon teszt: beszélj vagy készíts hangot a mikrofonba...")
+volume = np.sqrt(np.mean(audio**2))
 
-audio = sd.rec(int(SAMPLE_RATE * DURATION), samplerate=SAMPLE_RATE, channels=1)
-sd.wait()
+ print(f"Hangerő: {volume}")
 
-samples = audio.flatten()
-volume = np.sqrt(np.mean(samples**2))
-freq = get_frequency(audio)
+# --- FUTTATÁS ---
+if __name__ == "__main__":
+    print("Először listázzuk az eszközöket:")
+    list_devices()
 
-print(f"Hangerő (RMS): {volume:.6f}")
-if volume < VOLUME_THRESHOLD:
-    print("❌ Nem érzékel hangot, ellenőrizd a mikrofont vagy a hangerőt.")
-else:
-    print("✅ Hang érzékelve!")
-    print(f"Domináns frekvencia: {freq:.2f} Hz")
+print("\nAdd meg a mikrofon device ID-ját (Enter = alapértelmezett):")
+    inp = input("> ")
+
+ if inp.strip() == "":
+        test_mic(None)
+    else:
+        test_mic(int(inp))
